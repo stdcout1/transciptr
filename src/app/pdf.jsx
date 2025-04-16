@@ -1,7 +1,8 @@
 'use client'
-import { Suspense, use } from "react";
+import { useEffect, useState } from "react";
 import { parseTranscript } from "./parse";
-import * as pdfjsLib from "pdfjs-dist/build/pdf"
+import * as pdfjsLib from "pdfjs-dist/build/pdf";
+
 pdfjsLib.GlobalWorkerOptions.workerSrc = `https://cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjsLib.version}/pdf.worker.min.mjs`;
 
 async function getPdfText(data) {
@@ -12,27 +13,23 @@ async function getPdfText(data) {
     return (await Promise.all(pageTexts)).join('');
 }
 
-function testPdf() {
-    // Fetch the PDF and parse it into text as a single promise
-    return fetch("http://localhost:3000/transcript.pdf")
-        .then((response) => response.arrayBuffer())
-        .then((buffer) => getPdfText(buffer));
-}
-
-function PdfContent({ promise }) {
-    const data = use(promise); // Use the promise to suspend rendering until it's resolved
-    let json = JSON.stringify(parseTranscript(data))
-    console.log(json)
-    return <div>{json.transcript}</div>;
-}
-
 export default function Pdf() {
-    const pdfPromise = testPdf(); // Create a single promise for the PDF text
-    return (
-        <div>
-            <Suspense fallback={<div>Loading PDF...</div>}>
-                <PdfContent promise={pdfPromise} />
-            </Suspense>
-        </div>
-    )
+    const [text, setText] = useState(null);
+
+    useEffect(() => {
+        async function fetchPdf() {
+            const response = await fetch("/transcript.pdf"); // use relative URL for public asset
+            const buffer = await response.arrayBuffer();
+            const rawText = await getPdfText(buffer);
+            const parsed = parseTranscript(rawText);
+            setText(parsed.transcript);
+        }
+
+        fetchPdf();
+    }, []);
+
+    if (!text) return <div>Loading PDF...</div>;
+
+    return <div>{JSON.stringify(text)}</div>;
 }
+
